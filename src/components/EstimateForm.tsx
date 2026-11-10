@@ -1,25 +1,9 @@
-import React, { useState } from 'react';
-import { z } from 'zod';
+import React, { useState, useEffect } from 'react';
 import { Send, CheckCircle2, AlertCircle, Loader2, Shield } from 'lucide-react';
 import { siteConfig } from '../site.config.js';
 import { trackEstimateRequested } from '../lib/track.js';
-
-const clientEstimateSchema = z.object({
-  name: z.string().trim().min(2, 'Please enter your full legal name'),
-  email: z.string().trim().email('Please enter a valid email address'),
-  phone: z.string().trim().min(7, 'Please provide a valid contact phone number'),
-  street: z.string().trim().min(3, 'Property street address is required'),
-  city: z.string().trim().min(2, 'City is required'),
-  state: z.string().trim().min(2, 'State is required'),
-  zip: z.string().trim().min(4, 'ZIP code is required'),
-  service: z.string().min(1, 'Please select a roofing service'),
-  roofAge: z.string().min(1, 'Please estimate your roof age'),
-  message: z.string().optional(),
-  consent: z.boolean().refine((val) => val === true, {
-    message: 'You must check the consent box to receive an estimate',
-  }),
-  hp_field: z.string().max(0, 'Spam detected').optional(),
-});
+import { estimateFormSchema } from '../lib/schemas.js';
+import { apiRequest } from '../lib/api-client.js';
 
 interface FormValues {
   name: string;
@@ -34,7 +18,6 @@ interface FormValues {
   message?: string;
   consent: boolean;
   hp_field?: string;
-  authenticatedUserId?: string;
 }
 
 export const EstimateForm: React.FC = () => {
@@ -44,15 +27,20 @@ export const EstimateForm: React.FC = () => {
     phone: '',
     street: '',
     city: '',
-    state: siteConfig.serviceArea.states[0] || 'GA',
+    state: siteConfig.serviceArea.states[0] ? 'GA' : 'GA',
     zip: '',
     service: siteConfig.services[0].slug,
     roofAge: '11-15 years',
     message: '',
     consent: true,
     hp_field: '',
-    authenticatedUserId: undefined,
   });
+
+  // Track initial render timestamp to catch instant bot submissions (< 2s)
+  const [formLoadTimestamp, setFormLoadTimestamp] = useState<number>(0);
+  useEffect(() => {
+    setFormLoadTimestamp(Date.now());
+  }, []);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,32 +71,41 @@ export const EstimateForm: React.FC = () => {
     }
   };
 
-  const handleAutofillWhopUser = () => {
-    setFormData((prev) => ({
-      ...prev,
-      name: 'Marcus Vance',
-      email: 'marcus.vance@example.com',
-      phone: '(404) 555-0199',
-      street: '4200 North Highland Ave',
-      city: 'Atlanta',
-      state: 'GA',
-      zip: '30306',
-      authenticatedUserId: 'user_whop_verified_demo_01',
-      message: 'Inspected roof following high wind storm. Need architectural shingle replacement quote.',
-    }));
-    setErrors({});
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
 
-    const validation = clientEstimateSchema.safeParse(formData);
+    const payloadToValidate = {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      address: {
+        street: formData.street,
+        city: formData.city,
+        state: formData.state,
+        zip: formData.zip,
+      },
+      service: formData.service,
+      roofAge: formData.roofAge,
+      message: formData.message,
+      consent: formData.consent,
+      accountId: siteConfig.whop.accountId,
+      referrer: typeof window !== 'undefined' ? window.location.href : '',
+      hp_field: formData.hp_field,
+      formLoadTimestamp,
+    };
+
+    const validation = estimateFormSchema.safeParse(payloadToValidate);
     if (!validation.success) {
       const fieldErrors: Record<string, string> = {};
       (validation.error as any).issues.forEach((err: any) => {
-        if (err.path && err.path[0]) {
-          fieldErrors[err.path[0] as string] = err.message;
+        const fieldKey = err.path.join('.');
+        // Map address fields to flat input names for form rendering
+        const formInputName = err.path[0] === 'address' && err.path[1] ? err.path[1] : err.path[0];
+        if (formInputName) {
+          fieldErrors[formInputName as string] = err.message;
+        } else {
+          fieldErrors[fieldKey] = err.message;
         }
       });
       setErrors(fieldErrors);
@@ -118,42 +115,26 @@ export const EstimateForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        address: {
-          street: formData.street,
-          city: formData.city,
-          state: formData.state,
-          zip: formData.zip,
-        },
-        service: formData.service,
-        roofAge: formData.roofAge,
-        message: formData.message,
-        consent: formData.consent,
-        accountId: siteConfig.whop.accountId,
-        referrer: typeof window !== 'undefined' ? window.location.href : '',
-        hp_field: formData.hp_field,
-        authenticatedUserId: formData.authenticatedUserId,
-      };
-
-      const response = await fetch('/api/estimate', {
+      const response = await apiRequest<{
+        leadId: string;
+        message: string;
+        isMock?: boolean;
+      }>('/api/estimate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(validation.data),
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to submit estimate request');
+      if (!response.ok || !response.data) {
+        if (response.errors) {
+          setErrors(response.errors);
+        }
+        throw new Error(response.message || 'Failed to submit estimate request');
       }
 
       setSubmitSuccess({
-        leadId: data.leadId,
-        message: data.message || 'Estimate request logged directly with Whop CRM.',
-        isMock: data.isMock,
+        leadId: response.data.leadId,
+        message: response.data.message || 'Estimate request logged directly with Whop CRM.',
+        isMock: response.data.isMock,
       });
 
       // Fire whop pixel estimate_requested custom event ONLY in success handler
@@ -161,7 +142,7 @@ export const EstimateForm: React.FC = () => {
       trackEstimateRequested({
         service: formData.service,
         startingPrice: matchedService?.startingPrice,
-        leadId: data.leadId,
+        leadId: response.data.leadId,
       });
     } catch (err: any) {
       setSubmitError(err.message || 'An unexpected error occurred. Please try again.');
@@ -181,7 +162,7 @@ export const EstimateForm: React.FC = () => {
             Get an Itemized Xactimate® Quote for Your Property.
           </h2>
           <p className="text-base text-slate-600 mt-2">
-            No pressure sales. Our certified master inspectors provide comprehensive damage reports and insurance-ready bids within 24 hours.
+            No high-pressure sales. Our master inspectors provide comprehensive damage reports and insurance-ready bids within 24 hours.
           </p>
         </div>
 
@@ -248,25 +229,6 @@ export const EstimateForm: React.FC = () => {
               </div>
             )}
 
-            {/* Whop Account Fast-Fill Bar */}
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div>
-                <span className="font-bold text-slate-900 block">Existing Whop Account?</span>
-                <span className="text-slate-500 text-[11px]">
-                  {formData.authenticatedUserId
-                    ? `Verified Whop User ID attached: ${formData.authenticatedUserId}`
-                    : 'Auto-fill contact details and attach your estimate directly to your Whop profile.'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleAutofillWhopUser}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg transition-colors whitespace-nowrap self-start sm:self-auto text-[11px]"
-              >
-                {formData.authenticatedUserId ? 'Whop Account Connected' : 'Auto-fill with Whop'}
-              </button>
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {/* Full Name */}
               <div>
@@ -280,6 +242,7 @@ export const EstimateForm: React.FC = () => {
                   value={formData.name}
                   onChange={handleChange}
                   placeholder="e.g. Robert Vance"
+                  aria-invalid={!!errors.name}
                   className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-lg border ${
                     errors.name ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-300'
                   } focus:outline-none focus:ring-2 focus:ring-slate-900`}
@@ -299,6 +262,7 @@ export const EstimateForm: React.FC = () => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="robert@example.com"
+                  aria-invalid={!!errors.email}
                   className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-lg border ${
                     errors.email ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-300'
                   } focus:outline-none focus:ring-2 focus:ring-slate-900`}
@@ -317,7 +281,8 @@ export const EstimateForm: React.FC = () => {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  placeholder="(404) 555-0199"
+                  placeholder="(404) 555-0199 or +14045550199"
+                  aria-invalid={!!errors.phone}
                   className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-lg border ${
                     errors.phone ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-300'
                   } focus:outline-none focus:ring-2 focus:ring-slate-900`}
@@ -359,6 +324,7 @@ export const EstimateForm: React.FC = () => {
                     value={formData.street}
                     onChange={handleChange}
                     placeholder="Street Address (e.g. 4200 North Highland Ave)"
+                    aria-invalid={!!errors.street}
                     className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-lg border ${
                       errors.street ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-300'
                     } focus:outline-none focus:ring-2 focus:ring-slate-900`}
@@ -373,6 +339,7 @@ export const EstimateForm: React.FC = () => {
                     value={formData.city}
                     onChange={handleChange}
                     placeholder="City (e.g. Atlanta)"
+                    aria-invalid={!!errors.city}
                     className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-lg border ${
                       errors.city ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-300'
                     } focus:outline-none focus:ring-2 focus:ring-slate-900`}
@@ -385,13 +352,15 @@ export const EstimateForm: React.FC = () => {
                     name="state"
                     value={formData.state}
                     onChange={handleChange}
+                    aria-label="State"
                     className="w-full px-3.5 py-2.5 text-sm bg-white rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900"
                   >
-                    {siteConfig.serviceArea.states.map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
+                    <option value="GA">Georgia (GA)</option>
+                    <option value="TN">Tennessee (TN)</option>
+                    <option value="NC">North Carolina (NC)</option>
+                    <option value="AL">Alabama (AL)</option>
+                    <option value="FL">Florida (FL)</option>
+                    <option value="SC">South Carolina (SC)</option>
                   </select>
                 </div>
 
@@ -401,7 +370,8 @@ export const EstimateForm: React.FC = () => {
                     name="zip"
                     value={formData.zip}
                     onChange={handleChange}
-                    placeholder="ZIP Code"
+                    placeholder="ZIP Code (e.g. 30306)"
+                    aria-invalid={!!errors.zip}
                     className={`w-full px-3.5 py-2.5 text-sm bg-white rounded-lg border ${
                       errors.zip ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-300'
                     } focus:outline-none focus:ring-2 focus:ring-slate-900`}
@@ -472,12 +442,12 @@ export const EstimateForm: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full inline-flex justify-center items-center px-6 py-3.5 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 rounded-lg transition-colors shadow-sm"
+                className="w-full inline-flex justify-center items-center px-6 py-3.5 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 rounded-lg transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Connecting to Whop CRM...
+                    Transmitting to Whop CRM...
                   </>
                 ) : (
                   <>

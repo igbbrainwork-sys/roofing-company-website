@@ -10,7 +10,7 @@ interface MaterialOption {
   warrantyYears: number;
   impactRating: string;
   description: string;
-  image?: string;
+  colorHex: string;
   serviceSlug: string;
 }
 
@@ -22,6 +22,7 @@ const MATERIALS: MaterialOption[] = [
     warrantyYears: 30,
     impactRating: 'Class 3 (110 MPH Wind)',
     description: 'GAF Timberline HDZ / Owens Corning Oakridge dimensional shingles.',
+    colorHex: '#475569',
     serviceSlug: 'complete-replacement',
   },
   {
@@ -31,6 +32,7 @@ const MATERIALS: MaterialOption[] = [
     warrantyYears: 50,
     impactRating: 'Class 4 (UL 2218 Hail Impact)',
     description: 'SBS-modified asphalt shingles engineered to withstand 2-inch hail stones.',
+    colorHex: '#334155',
     serviceSlug: 'complete-replacement',
   },
   {
@@ -40,6 +42,7 @@ const MATERIALS: MaterialOption[] = [
     warrantyYears: 50,
     impactRating: 'Class 4 Impact & Class A Fire',
     description: 'Concealed fastener architectural standing seam panels with Kynar 500 finish.',
+    colorHex: '#1E293B',
     serviceSlug: 'complete-replacement',
   },
 ];
@@ -47,6 +50,7 @@ const MATERIALS: MaterialOption[] = [
 export const RoofCalculator: React.FC = () => {
   const [homeSqFt, setHomeSqFt] = useState<number>(2400);
   const [pitchMultiplier, setPitchMultiplier] = useState<number>(1.25); // Standard 6/12 pitch
+  const [pitchAngleDeg, setPitchAngleDeg] = useState<number>(26.5);
   const [pitchLabel, setPitchLabel] = useState<string>('Standard (6/12 Slope)');
   const [selectedMaterialId, setSelectedMaterialId] = useState<string>('class4_impact');
   const [layersToTearOff, setLayersToTearOff] = useState<number>(1);
@@ -56,7 +60,7 @@ export const RoofCalculator: React.FC = () => {
     [selectedMaterialId]
   );
 
-  // Calculation: Roof sqft is ground footprint * pitch factor + 10% waste
+  // Calculation: Roof sqft is ground footprint * pitch factor + 12% waste & hips/valleys
   const calculation = useMemo(() => {
     const roofAreaSqFt = Math.round(homeSqFt * pitchMultiplier * 1.12);
     const roofSquares = Math.round(roofAreaSqFt / 100);
@@ -114,7 +118,7 @@ export const RoofCalculator: React.FC = () => {
             {/* Square footage slider */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <label htmlFor="homeSqFtInput" className="text-xs font-bold uppercase tracking-wider text-slate-700">
                   Home Living Area (Square Feet)
                 </label>
                 <span className="text-sm font-bold text-slate-900 tabular-nums">
@@ -122,12 +126,14 @@ export const RoofCalculator: React.FC = () => {
                 </span>
               </div>
               <input
+                id="homeSqFtInput"
                 type="range"
                 min="1000"
                 max="5000"
                 step="100"
                 value={homeSqFt}
                 onChange={(e) => setHomeSqFt(Number(e.target.value))}
+                aria-label="Home living area in square feet"
                 className="w-full accent-slate-900 cursor-pointer h-2 bg-slate-200 rounded-lg"
               />
               <div className="flex justify-between text-[11px] text-slate-400 mt-1">
@@ -144,9 +150,9 @@ export const RoofCalculator: React.FC = () => {
               </label>
               <div className="grid grid-cols-3 gap-2.5">
                 {[
-                  { label: 'Low Slope (4/12)', factor: 1.15 },
-                  { label: 'Standard (6/12 - 8/12)', factor: 1.25 },
-                  { label: 'Steep / Multi-Gable', factor: 1.45 },
+                  { label: 'Low Slope (4/12)', factor: 1.15, angle: 18.4 },
+                  { label: 'Standard (6/12 - 8/12)', factor: 1.25, angle: 26.5 },
+                  { label: 'Steep / Multi-Gable', factor: 1.45, angle: 38.0 },
                 ].map((item) => {
                   const isSelected = pitchMultiplier === item.factor;
                   return (
@@ -155,9 +161,10 @@ export const RoofCalculator: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setPitchMultiplier(item.factor);
+                        setPitchAngleDeg(item.angle);
                         setPitchLabel(item.label);
                       }}
-                      className={`p-3 rounded-xl border text-left text-xs font-medium transition-colors ${
+                      className={`p-3 rounded-xl border text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${
                         isSelected
                           ? 'border-slate-900 bg-slate-900 text-white'
                           : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
@@ -170,6 +177,54 @@ export const RoofCalculator: React.FC = () => {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Dynamic Architectural Blueprint Cross-Section SVG */}
+            <div className="p-4 bg-white rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between text-xs font-mono text-slate-500 mb-2">
+                <span>ARCHITECTURAL CROSS-SECTION</span>
+                <span>PITCH: {pitchAngleDeg}°</span>
+              </div>
+              <div className="w-full h-28 bg-slate-950 rounded-lg overflow-hidden relative flex items-center justify-center p-2">
+                <svg viewBox="0 0 400 120" className="w-full h-full text-slate-600">
+                  {/* Grid Lines */}
+                  <line x1="0" y1="100" x2="400" y2="100" stroke="#334155" strokeWidth="1" />
+                  <line x1="200" y1="10" x2="200" y2="110" stroke="#1E293B" strokeDasharray="3 3" />
+
+                  {/* Ceiling Joist / Wall Plates */}
+                  <rect x="50" y="96" width="300" height="6" fill="#475569" />
+                  <rect x="60" y="102" width="20" height="15" fill="#334155" />
+                  <rect x="320" y="102" width="20" height="15" fill="#334155" />
+
+                  {/* Dynamic Roof Rafters based on pitchAngleDeg */}
+                  {/* Peak height calculated from slope angle */}
+                  <path
+                    d={`M 40 96 L 200 ${96 - Math.tan((pitchAngleDeg * Math.PI) / 180) * 120} L 360 96 Z`}
+                    fill={selectedMaterial.colorHex}
+                    opacity="0.8"
+                    stroke="#D97706"
+                    strokeWidth="2"
+                  />
+
+                  {/* Ridge cap marker */}
+                  <circle
+                    cx="200"
+                    cy={96 - Math.tan((pitchAngleDeg * Math.PI) / 180) * 120}
+                    r="4"
+                    fill="#F59E0B"
+                  />
+                  <text
+                    x="200"
+                    y={Math.max(16, 96 - Math.tan((pitchAngleDeg * Math.PI) / 180) * 120 - 8)}
+                    textAnchor="middle"
+                    fill="#F8FAFC"
+                    fontSize="10"
+                    fontFamily="monospace"
+                  >
+                    Ridge Vent: {pitchLabel.split(' ')[0]}
+                  </text>
+                </svg>
               </div>
             </div>
 
@@ -221,7 +276,7 @@ export const RoofCalculator: React.FC = () => {
                     key={layers}
                     type="button"
                     onClick={() => setLayersToTearOff(layers)}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${
                       layersToTearOff === layers
                         ? 'bg-slate-900 text-white border-slate-900'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -296,7 +351,7 @@ export const RoofCalculator: React.FC = () => {
               <button
                 type="button"
                 onClick={handleApplyToEstimate}
-                className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg transition-colors flex items-center justify-center gap-2 text-xs"
+                className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg transition-colors flex items-center justify-center gap-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
               >
                 <span>Apply Specs to Free On-Site Quote</span>
                 <ArrowRight className="w-4 h-4" />

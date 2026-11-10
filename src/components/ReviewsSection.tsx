@@ -1,8 +1,40 @@
-import React from 'react';
-import { Star, ShieldCheck, Award, FileCheck, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Star, Award, FileCheck, CheckCircle2, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { siteConfig } from '../site.config.js';
 
 export const ReviewsSection: React.FC = () => {
+  const reviews = siteConfig.reviews.items;
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-advance reviews carousel every 6 seconds if playing and not hovered
+  useEffect(() => {
+    // If reduced motion is preferred, default to paused
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setIsPlaying(false);
+      return;
+    }
+
+    if (isPlaying && !isHovered) {
+      timerRef.current = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % reviews.length);
+      }, 6000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isPlaying, isHovered, reviews.length]);
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % reviews.length);
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + reviews.length) % reviews.length);
+  };
+
   return (
     <section id="reviews" className="py-20 bg-white border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,44 +80,101 @@ export const ReviewsSection: React.FC = () => {
           </div>
         </div>
 
-        {/* Testimonials Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
-          {siteConfig.reviews.items.map((review, idx) => (
-            <div
-              key={idx}
-              className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col justify-between hover:border-slate-300 transition-colors shadow-sm"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center text-amber-500">
-                    {[...Array(review.rating)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-current text-amber-500" />
-                    ))}
-                  </div>
-                  {/* Unboxed clean metadata (anti-slop rule) */}
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                    <span>{review.city}, {review.state}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{review.date}</span>
-                  </div>
-                </div>
+        {/* Accessible Reviews Carousel */}
+        <div
+          role="region"
+          aria-label="Homeowner Reviews Carousel"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          onFocus={() => setIsHovered(true)}
+          onBlur={() => setIsHovered(false)}
+          className="relative bg-slate-50 rounded-2xl border border-slate-200 p-6 sm:p-10 mb-16 shadow-xs"
+        >
+          {siteConfig.isSample && (
+            <div className="absolute top-4 right-4 bg-amber-100/80 border border-amber-300 text-amber-900 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-semibold">
+              Sample Case Studies
+            </div>
+          )}
 
-                <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                  "{review.text}"
-                </p>
+          <div className="max-w-3xl mx-auto space-y-6">
+            {/* Stars & Meta */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center text-amber-500">
+                {[...Array(reviews[currentIndex].rating)].map((_, i) => (
+                  <Star key={i} className="w-5 h-5 fill-current text-amber-500" />
+                ))}
               </div>
-
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-bold text-slate-900">{review.name}</p>
-                  <p className="text-slate-500 text-[11px]">{review.projectType}</p>
-                </div>
-                <span className="text-emerald-700 font-medium text-[11px] flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Verified Completion
-                </span>
+              <div className="text-xs text-slate-400 font-medium">
+                <span>{reviews[currentIndex].city}, {reviews[currentIndex].state}</span>
+                <span className="mx-2" aria-hidden="true">·</span>
+                <span>{reviews[currentIndex].date}</span>
               </div>
             </div>
-          ))}
+
+            {/* Quote */}
+            <blockquote className="text-base sm:text-lg text-slate-800 font-medium leading-relaxed italic">
+              "{reviews[currentIndex].text}"
+            </blockquote>
+
+            {/* Customer identity */}
+            <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div>
+                <p className="font-bold text-slate-900 text-sm">{reviews[currentIndex].name}</p>
+                <p className="text-slate-500 text-xs">{reviews[currentIndex].projectType}</p>
+              </div>
+              <span className="text-emerald-700 font-semibold text-xs flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4" /> Verified Municipal Inspection Signoff
+              </span>
+            </div>
+          </div>
+
+          {/* Carousel controls */}
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-200 max-w-3xl mx-auto">
+            {/* Dots */}
+            <div className="flex items-center gap-1.5" role="tablist" aria-label="Review select">
+              {reviews.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  aria-label={`Go to review ${idx + 1}`}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`w-2.5 h-2.5 rounded-full transition-all ${
+                    currentIndex === idx ? 'w-6 bg-slate-900' : 'bg-slate-300 hover:bg-slate-400'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* Play/Pause & Arrow buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsPlaying(!isPlaying)}
+                aria-label={isPlaying ? 'Pause automatic carousel advance' : 'Resume automatic carousel advance'}
+                className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+              >
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePrev}
+                aria-label="Previous review"
+                className="p-2 rounded-lg text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNext}
+                aria-label="Next review"
+                className="p-2 rounded-lg text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Trust Badges & Insurance Proof Strip */}

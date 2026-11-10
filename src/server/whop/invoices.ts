@@ -5,10 +5,10 @@
  * and hosted checkout emailing (mode: "manual") according to:
  * https://docs.whop.com/developer/guides/invoices
  *
- * Requirements:
+ * Security & Reliability Requirements:
  * - Api-Version-Date: 2026-10-24 or later
  * - Idempotency-Key: crypto.randomUUID() on every POST
- * - Constant-time comparison for ADMIN_TOKEN
+ * - Constant-time comparison for ADMIN_TOKEN via SHA-256 hashing
  * - Friendly error handling for invoice_tax_address_required, invoice_payment_method_unavailable
  */
 
@@ -50,16 +50,18 @@ export interface InvoiceResult {
 }
 
 /**
- * Constant-time comparison helper to prevent timing attacks on ADMIN_TOKEN
+ * Constant-time comparison helper using SHA-256 digests.
+ * Hashing both inputs to fixed 32-byte buffers ensures crypto.timingSafeEqual
+ * is ALWAYS invoked on identical length buffers, completely mitigating timing attacks
+ * and length leakage.
  */
 export function verifyAdminToken(providedToken?: string): boolean {
   const secret = process.env.ADMIN_TOKEN || 'roofing-admin-secret-2026';
   if (!providedToken) return false;
   try {
-    const a = Buffer.from(providedToken);
-    const b = Buffer.from(secret);
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
+    const hashProvided = crypto.createHash('sha256').update(providedToken).digest();
+    const hashSecret = crypto.createHash('sha256').update(secret).digest();
+    return crypto.timingSafeEqual(hashProvided, hashSecret);
   } catch {
     return false;
   }

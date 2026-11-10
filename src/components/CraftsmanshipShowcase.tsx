@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ShieldCheck, AlertTriangle, CheckCircle2, ZoomIn, ArrowRight } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
 import { trackWhopEvent } from '../lib/track.js';
+import { BeforeAfterSlider } from './ui/BeforeAfterSlider.js';
 
 interface ShowcaseItem {
   id: string;
@@ -12,17 +13,19 @@ interface ShowcaseItem {
   badge: string;
   points: { title: string; desc: string }[];
   insuranceTip?: string;
+  isComparison?: boolean;
 }
 
 const SHOWCASES: ShowcaseItem[] = [
   {
     id: 'hail_damage',
-    tabLabel: '01. Hail & Wind Forensic Audit',
+    tabLabel: '01. Forensic Damage Audit vs Restoration',
     title: 'Severe Storm Impact & Fracture Documentation',
     subtitle: 'High-velocity hail spatter ruptures the underlying fiberglass matting, destroying waterproofing.',
     image: '/src/assets/images/roof_storm_damage_audit_1794315228015.jpg',
     category: 'audit',
-    badge: 'Forensic Audit Sample',
+    badge: 'Interactive Forensic Slider',
+    isComparison: true,
     points: [
       {
         title: 'Bruised Fiberglass Matting',
@@ -119,15 +122,17 @@ export const CraftsmanshipShowcase: React.FC = () => {
           </div>
 
           {/* Interactive segmented tab bar */}
-          <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/80 rounded-xl overflow-x-auto shrink-0">
+          <div role="tablist" className="flex items-center gap-1.5 p-1.5 bg-slate-200/80 rounded-xl overflow-x-auto shrink-0">
             {SHOWCASES.map((item) => {
               const isSelected = item.id === activeTab;
               return (
                 <button
                   key={item.id}
+                  role="tab"
                   type="button"
+                  aria-selected={isSelected}
                   onClick={() => handleTabSwitch(item.id)}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 ${
                     isSelected
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
@@ -142,24 +147,35 @@ export const CraftsmanshipShowcase: React.FC = () => {
 
         {/* Detail Showcase Container */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm grid grid-cols-1 lg:grid-cols-12 items-stretch">
-          {/* Image visual with contrast scrim (col-span-6) */}
-          <div className="lg:col-span-6 relative bg-slate-950 aspect-[16/10] lg:aspect-auto min-h-[360px] group">
-            <img
-              src={activeItem.image}
-              alt={activeItem.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+          {/* Visual Showcase (col-span-6) */}
+          <div className="lg:col-span-6 relative bg-slate-950 flex flex-col justify-center">
+            {activeItem.isComparison ? (
+              <BeforeAfterSlider
+                beforeImage="/src/assets/images/roof_storm_damage_audit_1794315228015.jpg"
+                afterImage="/src/assets/images/roofing_hero_craftsman_1794307300936.jpg"
+                beforeLabel="Hail Damage (Audit)"
+                afterLabel="Completed Restoration"
+              />
+            ) : (
+              <div className="relative aspect-[16/10] lg:aspect-auto min-h-[360px] group overflow-hidden">
+                <img
+                  src={activeItem.image}
+                  alt={activeItem.title}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
 
-            <div className="absolute top-4 left-4 bg-slate-900/90 text-amber-400 border border-slate-700 px-3 py-1 rounded-lg text-xs font-mono font-semibold">
-              {activeItem.badge}
-            </div>
+                <div className="absolute top-4 left-4 bg-slate-900/90 text-amber-400 border border-slate-700 px-3 py-1 rounded-lg text-xs font-mono font-semibold">
+                  {activeItem.badge}
+                </div>
 
-            <div className="absolute bottom-4 left-4 right-4 text-white text-xs">
-              <p className="font-semibold">{activeItem.title}</p>
-              <p className="text-slate-300 text-[11px] mt-0.5">{activeItem.subtitle}</p>
-            </div>
+                <div className="absolute bottom-4 left-4 right-4 text-white text-xs">
+                  <p className="font-semibold">{activeItem.title}</p>
+                  <p className="text-slate-300 text-[11px] mt-0.5">{activeItem.subtitle}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Technical Explanations (col-span-6) */}

@@ -15,6 +15,7 @@ import { FaqSection } from './components/FaqSection.js';
 import { Footer } from './components/Footer.js';
 import { MobileBottomBar } from './components/MobileBottomBar.js';
 import { EventsDebugDrawer } from './components/EventsDebugDrawer.js';
+import { LegalModal } from './components/LegalModal.js';
 import { CheckoutPage } from './routes/CheckoutPage.js';
 import { CheckoutReturnPage } from './routes/CheckoutReturnPage.js';
 import { AdminPage } from './routes/AdminPage.js';
@@ -23,6 +24,7 @@ export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(
     typeof window !== 'undefined' ? window.location.pathname : '/'
   );
+  const [legalModalType, setLegalModalType] = useState<'privacy' | 'terms' | null>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -69,7 +71,7 @@ export default function App() {
 
   // Inject LocalBusiness + RoofingContractor Schema.org JSON-LD structured data from siteConfig
   useEffect(() => {
-    const schemaData = {
+    const schemaData: Record<string, any> = {
       '@context': 'https://schema.org',
       '@type': 'RoofingContractor',
       'name': siteConfig.brand.name,
@@ -84,12 +86,6 @@ export default function App() {
         'postalCode': siteConfig.brand.address.zip,
         'addressCountry': siteConfig.brand.address.country,
       },
-      'aggregateRating': {
-        '@type': 'AggregateRating',
-        'ratingValue': siteConfig.reviews.aggregate.score,
-        'reviewCount': siteConfig.reviews.aggregate.reviewCount,
-        'bestRating': siteConfig.reviews.aggregate.scale,
-      },
       'areaServed': siteConfig.serviceArea.cities.map((city) => ({
         '@type': 'City',
         'name': city,
@@ -97,6 +93,16 @@ export default function App() {
       'priceRange': '$$',
       'openingHours': 'Mo-Sa 07:00-19:00',
     };
+
+    // If verified production mode (not sample data), include aggregate rating and credentials
+    if (!siteConfig.isSample) {
+      schemaData['aggregateRating'] = {
+        '@type': 'AggregateRating',
+        'ratingValue': siteConfig.reviews.aggregate.score,
+        'reviewCount': siteConfig.reviews.aggregate.reviewCount,
+        'bestRating': siteConfig.reviews.aggregate.scale,
+      };
+    }
 
     let scriptTag = document.getElementById('roofing-jsonld') as HTMLScriptElement | null;
     if (!scriptTag) {
@@ -141,9 +147,15 @@ export default function App() {
         <FaqSection />
       </main>
 
-      <Footer />
+      <Footer onOpenLegal={(type) => setLegalModalType(type)} />
       <MobileBottomBar />
       <EventsDebugDrawer />
+
+      {/* Accessible Privacy and Terms modal */}
+      <LegalModal
+        type={legalModalType}
+        onClose={() => setLegalModalType(null)}
+      />
     </div>
   );
 }

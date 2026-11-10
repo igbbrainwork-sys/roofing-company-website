@@ -7,6 +7,8 @@
  * warranty copy, and FAQs propagate automatically throughout the application.
  */
 
+import { z } from 'zod';
+
 export interface WhopPlanConfig {
   planId: string;
   productId: string;
@@ -45,6 +47,15 @@ export interface FaqItem {
 }
 
 export interface SiteConfig {
+  /**
+   * Set isSample to true when using illustrative demo copy, placeholder license,
+   * or sample reviews. Setting this to false activates verified production mode
+   * and includes full credentials in Schema.org JSON-LD structured data.
+   */
+  isSample: boolean;
+  motion: {
+    intensity: 'full' | 'reduced';
+  };
   brand: {
     name: string;
     tagline: string;
@@ -116,6 +127,10 @@ export interface SiteConfig {
 }
 
 export const siteConfig: SiteConfig = {
+  isSample: true, // Marked as sample content for demo/pitch mode
+  motion: {
+    intensity: 'full',
+  },
   brand: {
     name: "Apex Roofing & Restoration",
     tagline: "Architectural Roofing, Certified Storm Restorations & Commercial Envelopes",
@@ -369,29 +384,166 @@ export const siteConfig: SiteConfig = {
     {
       question: "How does paying online with Whop protect me as a homeowner?",
       answer: "Whop is an enterprise-grade payment and commerce infrastructure. When you pay a deposit or book an inspection through this site, your transaction is processed with bank-level 256-bit encryption. Card details are securely vaulted—not stored on our servers. For deposits, your card is kept securely on file and final payments are only invoiced after final building inspection and your 100% satisfaction.",
+      category: "Payments",
     },
     {
       question: "Will the $149 inspection fee be credited toward my repair or replacement?",
       answer: "Yes, 100% of your inspection fee is credited directly onto your invoice when you move forward with any recommended repair or replacement over $500.",
+      category: "Inspections",
     },
     {
       question: "How does the card-on-file deposit work for large projects?",
       answer: "When you book your project deposit ($500), your payment details are securely saved via Whop's off-session credential vault. Once your roof replacement is completed, inspected by local code officials, and you have signed off on the final walkthrough, our team generates your itemized final balance invoice. You can choose to have it charged automatically or receive an email checkout link to pay manually.",
+      category: "Payments",
     },
     {
       question: "Can I pay with installments or buy now pay later?",
       answer: "Yes. Flexible installment financing options such as Klarna, Afterpay, or Splitit automatically appear on the Whop checkout page for eligible purchases and approved buyers. You can review exact monthly payment schedules before confirming your transaction.",
+      category: "Financing",
     },
     {
       question: "How quickly can an emergency leak or storm crew arrive?",
       answer: "For emergency tarping or active storm leaks, our rapid response units dispatch within 45 to 90 minutes across our core metro service areas. We carry heavy-duty reinforced tarps, structural batten boards, and temporary sealants to stop water ingress immediately.",
+      category: "Emergency",
     },
     {
       question: "Do you assist with insurance claims and adjuster meetings?",
       answer: "Absolutely. Our certified inspectors build itemized 28-point forensic photo reports formatted specifically for insurance claims adjusters. We attend adjuster walkthroughs in person to advocate for complete and proper roof scope replacement.",
+      category: "Insurance",
     },
   ],
 };
+
+/**
+ * Zod schema to validate siteConfig integrity at compile and test time
+ */
+export const siteConfigSchema = z.object({
+  isSample: z.boolean(),
+  motion: z.object({
+    intensity: z.enum(['full', 'reduced']),
+  }),
+  brand: z.object({
+    name: z.string().min(1),
+    tagline: z.string().min(1),
+    shortTagline: z.string().min(1),
+    phone: z.string().min(7),
+    phoneFormatted: z.string().min(7),
+    email: z.string().email(),
+    address: z.object({
+      street: z.string().min(1),
+      city: z.string().min(1),
+      state: z.string().min(1),
+      zip: z.string().min(1),
+      country: z.string().min(1),
+    }),
+    licenseNumber: z.string().min(1),
+    yearsInBusiness: z.number().positive(),
+    hours: z.string().min(1),
+    emergencyAvailable: z.boolean(),
+    colors: z.object({
+      primary: z.string(),
+      accent: z.string(),
+      neutral: z.string(),
+    }),
+    fontStack: z.string(),
+  }),
+  whop: z.object({
+    accountId: z.string(),
+    plans: z.object({
+      inspection: z.object({
+        planId: z.string(),
+        productId: z.string(),
+        title: z.string(),
+        priceUSD: z.number().positive(),
+        description: z.string(),
+        badge: z.string().optional(),
+        features: z.array(z.string()),
+      }),
+      deposit: z.object({
+        planId: z.string(),
+        productId: z.string(),
+        title: z.string(),
+        priceUSD: z.number().positive(),
+        description: z.string(),
+        badge: z.string().optional(),
+        features: z.array(z.string()),
+      }),
+      flatRate: z.object({
+        planId: z.string(),
+        productId: z.string(),
+        title: z.string(),
+        priceUSD: z.number().positive(),
+        description: z.string(),
+        badge: z.string().optional(),
+        features: z.array(z.string()),
+      }),
+    }),
+    finalBalancePlanId: z.string(),
+    environment: z.enum(['production', 'sandbox']),
+  }),
+  services: z.array(
+    z.object({
+      slug: z.string().min(1),
+      title: z.string().min(1),
+      blurb: z.string().min(1),
+      icon: z.enum(['ShieldCheck', 'Hammer', 'SearchCheck', 'Sparkles', 'CloudRain', 'Wrench']),
+      startingPrice: z.number().optional(),
+      bullets: z.array(z.string()),
+      featuredPlan: z.enum(['inspection', 'deposit', 'flatRate']).optional(),
+      detailedDescription: z.string().optional(),
+    })
+  ),
+  serviceArea: z.object({
+    states: z.array(z.string()),
+    cities: z.array(z.string()),
+    radiusNote: z.string(),
+    dispatchNote: z.string(),
+  }),
+  financing: z.object({
+    headline: z.string(),
+    body: z.string(),
+    learnMoreCopy: z.string(),
+    highlights: z.array(z.string()),
+  }),
+  reviews: z.object({
+    aggregate: z.object({
+      score: z.number(),
+      reviewCount: z.number(),
+      scale: z.number(),
+      verifiedPercentage: z.number(),
+    }),
+    items: z.array(
+      z.object({
+        name: z.string(),
+        city: z.string(),
+        state: z.string(),
+        rating: z.number(),
+        text: z.string(),
+        date: z.string(),
+        projectType: z.string(),
+      })
+    ),
+  }),
+  trust: z.object({
+    badges: z.array(
+      z.object({
+        title: z.string(),
+        subtitle: z.string(),
+        highlight: z.string(),
+      })
+    ),
+    warrantyCopy: z.string(),
+    insuranceCopy: z.string(),
+    materialsPartner: z.string(),
+  }),
+  faq: z.array(
+    z.object({
+      question: z.string(),
+      answer: z.string(),
+      category: z.string().optional(),
+    })
+  ),
+});
 
 /**
  * Helper to detect if siteConfig contains unconfigured placeholder Whop IDs.

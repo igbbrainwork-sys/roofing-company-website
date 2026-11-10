@@ -1,180 +1,70 @@
-# Apex Roofing & Restoration — Whop Website Contractor Template
+# Apex Roofing & Restoration — Whop Websites Template
 
-A production-ready, reusable website template designed for US residential and commercial roofing companies, hosted on **Whop Websites** and powered by **Whop Elements**, **Whop Payments**, **Whop Leads**, and the **Whop Invoices API**.
-
----
-
-## 1. Creating the Three Plans in the Whop Dashboard
-
-To accept real payments and deposits from homeowners, set up three digital products/plans inside your [Whop Dashboard](https://whop.com/dashboard):
-
-1. **Plan 1: Comprehensive Roof Inspection (One-Time Payment)**
-   - Navigate to **Products** &rarr; **New Product**. Title: `Forensic Roof Inspection`.
-   - Under **Pricing / Plans**, click **Add Plan**.
-   - Type: **One-time payment**.
-   - Price: `$149.00 USD`.
-   - Copy the Plan ID (starts with `plan_...`) and Product ID (starts with `prod_...`).
-   - Paste into `/src/site.config.ts` under `siteConfig.whop.plans.inspection`.
-
-2. **Plan 2: Project Booking & Material Lock Deposit (Card on File)**
-   - Navigate to **Products** &rarr; **New Product**. Title: `Roofing Project Deposit`.
-   - Under **Pricing / Plans**, click **Add Plan**.
-   - Type: **One-time payment**.
-   - Price: `$500.00 USD`.
-   - Copy the Plan ID (starts with `plan_...`) and Product ID (starts with `prod_...`).
-   - Paste into `/src/site.config.ts` under `siteConfig.whop.plans.deposit`.
-   - *Note:* In checkout, this plan operates with `setupFutureUsage="off_session"`, storing the customer's payment credential in Whop's secure vault for the final balance invoice.
-
-3. **Plan 3: Emergency Tarping & Rapid Leak Defense (Flat-Rate Service)**
-   - Navigate to **Products** &rarr; **New Product**. Title: `Emergency Roof Tarping`.
-   - Under **Pricing / Plans**, click **Add Plan**.
-   - Type: **One-time payment**.
-   - Price: `$395.00 USD`.
-   - Copy the Plan ID (starts with `plan_...`) and Product ID (starts with `prod_...`).
-   - Paste into `/src/site.config.ts` under `siteConfig.whop.plans.flatRate`.
-
-4. **Final Balance Plan (Optional / Invoicing)**
-   - If using a fixed variant for the final project balance, create a `$0` or custom variable product plan in Whop.
-   - Copy the Plan ID and paste into `/src/site.config.ts` under `siteConfig.whop.finalBalancePlanId`.
-
-5. **Merchant Company Account ID**
-   - In your Whop Dashboard Settings &rarr; Company &rarr; Copy Company ID (`biz_...`).
-   - Paste into `/src/site.config.ts` under `siteConfig.whop.accountId` or set `VITE_WHOP_ACCOUNT_ID`.
+Production-ready, customizable website template for United States roofing contractors, designed for hosting on **Whop Websites**. Demonstrates end-to-end Whop commerce, payments, lead generation, and off-session invoicing workflows.
 
 ---
 
-## 2. Creating an API Key & Required Permissions
+## Requirements to Code Traceability Table
 
-Your server communicates securely with the Whop API without ever exposing keys to the browser:
-
-1. Open **Whop Dashboard** &rarr; **Developer** &rarr; **API Keys**.
-2. Click **Create API Key**. Name: `Roofing Website Server Key`.
-3. Check the following required permission scopes:
-   - `lead:manage` — Required to log homeowner estimate requests into Whop CRM via `POST /leads`.
-   - `member:email:read` — Required to search and resolve customer members by email via `client.members.list`.
-   - `member:basic:read` — Required to retrieve customer profiles and member IDs.
-   - `access_pass:basic:read` — Required to verify customer product access.
-   - `payment:charge` — Required to confirm deposits and charge vaulted cards off-session via `POST /invoices/{id}/issue`.
-   - `payment:basic:read` — Required to query transactions and inspect payment methods via `client.paymentMethods.list`.
-   - `plan:create` — *(Optional)* Required if dynamically generating custom inline plans for custom final balance amounts.
-4. Copy the generated secret key (starts with `whop_api_key_...`).
+| Requirement / Constraint | Implementation File(s) | Verification / Details |
+|---|---|---|
+| **Whop Payments Only** (No Stripe/PayPal SDKs or custom card forms) | `/src/components/CheckoutDeposit.tsx`<br>`/src/components/CheckoutOneTime.tsx` | Uses `<Payments>`, `<PaymentElement>`, `<Checkout>`, `<CheckoutElement>`, `<ExpressCheckoutElement>` from `@whop/elements-react`. |
+| **Mandatory BrandingElement** on every payment surface | `/src/components/CheckoutDeposit.tsx` (line 145)<br>`/src/components/CheckoutOneTime.tsx` (line 89) | Mounts `<BrandingElement />`. Prevents runtime `BrandingRequiredError`. |
+| **One-Time Checkout (Inspection & Flat-Rate)** | `/src/components/CheckoutOneTime.tsx` | Separate `<Checkout>` handles for `<ExpressCheckoutElement />` and `<CheckoutElement />`. |
+| **Project Deposit ($500) & Card Vaulting** | `/src/components/CheckoutDeposit.tsx`<br>`/src/server/whop/payments.ts` | `<Payments setupFutureUsage="off_session">` generates confirmation token; confirmed via Whop Payments API. |
+| **Whop Leads API** (Estimate Form) | `/src/components/EstimateForm.tsx`<br>`/src/server/whop/leads.ts`<br>`/src/server/routes/api.ts` | POSTs to Whop Leads API with `Api-Version-Date: 2026-10-24`. Prospective leads use `user_id: null` and full identity in `metadata`. |
+| **Whop Pixel Event Tracking** | `/src/lib/track.ts`<br>`/src/components/EventsDebugDrawer.tsx` | Custom events: `estimate_requested`, `service_viewed`, `deposit_started` with stable `event_id`s and on-page debug drawer (`?debug=1`). |
+| **Whop Invoices API** (Final Balance) | `/src/server/whop/invoices.ts`<br>`/src/routes/AdminPage.tsx` | Supports `mode: "auto"` (off-session charge) and `mode: "manual"` (email pay link), pinned `Api-Version-Date: 2026-10-24`, UUID `Idempotency-Key`. |
+| **Server-Only API Key** | `/src/server/whop/client.ts`<br>`/src/server/routes/api.ts` | `WHOP_API_KEY` read strictly via `process.env.WHOP_API_KEY` on server. Never exposed to Vite client bundle. |
+| **Template Reusability via Single File** | `/src/site.config.ts` | Swapping company name, services, prices, plans, phone, license, reviews, and service area requires editing ONLY `site.config.ts`. |
+| **Timing-Safe Admin Security** | `/src/server/whop/invoices.ts` (lines 59-67) | Constant-time `verifyAdminToken` using SHA-256 fixed 32-byte digests with `crypto.timingSafeEqual` prevents timing/length leakage. |
+| **Shared Zod Validation & Normalization** | `/src/lib/schemas.ts`<br>`/src/lib/api-client.ts` | Phone normalized to E.164, US state and ZIP code validated, HTML tags stripped, anti-bot honeypot and >2s submission check. |
+| **Accessible Design System & Motion** | `/src/components/ui/*`<br>`/src/index.css` | Atomic UI library (`Button`, `Card`, `Tabs`, `Accordion`, `Toast`, `Skeleton`, `BeforeAfterSlider`). Respects `prefers-reduced-motion`. |
+| **LocalBusiness Schema.org Structured Data** | `/src/App.tsx` (lines 70-108) | Injects dynamic JSON-LD for SEO. Omits unverified claims when `isSample: true`. |
+| **Automated Vitest Test Suite** | `/tests/*.test.ts` | 13 automated unit tests covering schemas, price math, siteConfig, and token verification. |
 
 ---
 
-## 3. Setting Secrets for the Deployed App
+## Getting Started
 
-In your hosting environment (or local `.env`):
-
+### 1. Environment Setup
+Copy the example environment configuration:
 ```bash
-# Whop Server Secret Key (NEVER exposed to client)
-WHOP_API_KEY="whop_api_key_your_actual_key"
+cp .env.example .env
+```
+Populate your environment variables:
+- `WHOP_API_KEY`: Your Whop merchant API key (`whop_api_...`)
+- `VITE_WHOP_ACCOUNT_ID`: Your company account ID (`biz_...`)
+- `ADMIN_TOKEN`: Secret token used to authorize final balance invoicing from the admin portal
 
-# Whop Webhook Signature Secret
-WHOP_WEBHOOK_SECRET="whop_whsec_your_actual_secret"
+### 2. Run the Development Server
+```bash
+npm run dev
+```
+Starts the full-stack server on `http://localhost:3000`.
 
-# Admin Token for Final Balance Invoicing Console (/admin)
-ADMIN_TOKEN="roofing-admin-secret-2026"
+### 3. Run Automated Tests & Checks
+```bash
+# Run unit test suite
+npm run test
 
-# Elements Environment: "production" or "sandbox"
-VITE_WHOP_ENV="production"
-
-# Company Account ID
-VITE_WHOP_ACCOUNT_ID="biz_your_company_id"
-
-# Base Application URL
-APP_URL="https://your-roofing-domain.com"
+# Run full project verification (TypeScript lint + Vitest tests)
+npm run check
 ```
 
 ---
 
-## 4. Registering the Webhook
+## Deployment to Whop Hosting
 
-Whop webhooks provide server-to-server confirmation of payments and card vaulting:
-
-1. Open **Whop Dashboard** &rarr; **Developer** &rarr; **Webhooks**.
-2. Click **Add Endpoint**.
-3. Endpoint URL: `https://your-roofing-domain.com/api/webhooks/whop`
-4. Subscribe to the following events:
-   - `payment.succeeded` — Triggered when an inspection fee, deposit, or final balance invoice is paid.
-   - `payment.failed` — Triggered if an off-session charge or customer payment is declined.
-   - `setup_intent.succeeded` — Triggered when a customer's card is successfully vaulted for future off-session charging.
-5. Copy the **Signing Secret** (`whop_whsec_...`) into your `WHOP_WEBHOOK_SECRET` environment variable.
-
-The server verifies all incoming webhooks using `unwrapWebhook` from `@whop/sdk/helpers`.
-
----
-
-## 5. Whop CLI Workflow
-
-Use the Whop CLI to test and deploy:
-
+See `/MIGRATION.md` for full instructions. Deploying to Whop Websites uses the Whop CLI:
 ```bash
-# Install or use Whop CLI
-npx @whop/cli login
-
-# Start development with hot reloading and tunnel
-whop apps dev
-
-# Deploy the website bundle to Whop Websites hosting
-whop apps deploy
-
-# Inspect live server logs
-whop apps logs
+whop apps dev     # Local development emulator
+whop apps deploy  # Production build and deployment
+whop apps logs    # Live server logs and webhook traces
 ```
 
 ---
 
-## 6. How to Re-Skin the Template for a New Client
+## Re-skinning for New Clients
 
-To adapt this website for any roofing contractor in the US, you only edit **a single file**: `/src/site.config.ts`.
-
-1. **Brand Identity**:
-   - Update `brand.name`, `brand.tagline`, `brand.phone`, `brand.email`, and `brand.address`.
-   - Update `brand.licenseNumber` and `brand.yearsInBusiness`.
-2. **Colors & Typography**:
-   - Adjust `brand.colors.primary` (e.g. Navy, Slate, Charcoal) and `brand.colors.accent` (e.g. Amber, Gold, Forest Green).
-3. **Services & Starting Prices**:
-   - Update the `services[]` array with the client's specialties (Asphalt, Standing Seam Metal, TPO Flat Roofs, etc.).
-4. **Service Area**:
-   - List the client's supported `states` and `cities[]`. The CSS vector map updates dynamically.
-5. **Whop IDs**:
-   - Replace `accountId` and `plans` with the client's specific Whop IDs.
-6. **Customer Reviews & Badges**:
-   - Replace `reviews.items[]` with authentic testimonials and municipal permit locations.
-
-Zero structural HTML or routing edits are required.
-
----
-
-## 7. Verification Checklist
-
-| Requirement | Implementation Location | Verification Method |
-| :--- | :--- | :--- |
-| **Whop Payments Only** | `/src/components/CheckoutOneTime.tsx`, `/src/components/CheckoutDeposit.tsx` | Uses `@whop/elements-react`. No Stripe, PayPal, or custom card inputs exist. |
-| **Single Config Re-Skin** | `/src/site.config.ts` | All copy, plans, phone numbers, and colors derive strictly from `siteConfig`. |
-| **Whop Elements Provider** | `/src/routes/CheckoutPage.tsx` | Wraps surface in `<WhopElements elements={loadWhop()} appearance={...}>`. |
-| **Mandatory BrandingElement** | `/src/components/CheckoutOneTime.tsx`, `/src/components/CheckoutDeposit.tsx` | Mounted on every payment surface to prevent `BrandingRequiredError`. |
-| **Deposit Card-on-File** | `/src/components/CheckoutDeposit.tsx`, `/src/server/whop/payments.ts` | Uses `<Payments setupFutureUsage="off_session">` & `payments.createConfirmationToken()`. |
-| **Whop Leads API** | `/src/components/EstimateForm.tsx`, `/src/server/whop/leads.ts` | Validated by Zod, calls `POST https://api.whop.com/api/v1/leads` with `Api-Version-Date: 2026-10-24`. |
-| **Lead User Resolution** | `/src/server/whop/leads.ts` (`resolveLeadUser`) | Queries `client.members.list({ query: email })`. Falls back to metadata if user does not exist yet. |
-| **Final Balance Invoices** | `/src/server/whop/invoices.ts`, `/src/routes/AdminPage.tsx` | Supports mode "auto" (off-session `issue()`) and mode "manual" (hosted link `send()`). Pinned 2026-10-24. |
-| **Pixel Event Deduplication** | `/src/lib/track.ts` | Emits `event_id` on all tracking calls (`estimate_requested`, `service_viewed`, `deposit_started`). |
-| **On-Page Events Drawer** | `/src/components/EventsDebugDrawer.tsx` | Viewable via `?debug=1` or dev button; audits all fired events on screen. |
-| **Checkout Return Flow** | `/src/routes/CheckoutReturnPage.tsx` | Reads `status`, `payment`, and `setup` query params before rendering status. |
-| **Webhook Verification** | `/src/server/routes/api.ts` | Verified with `unwrapWebhook` from `@whop/sdk/helpers` using `WHOP_WEBHOOK_SECRET`. |
-| **SEO & Schema.org** | `/src/App.tsx`, `/index.html` | Generates dynamic `LocalBusiness` and `RoofingContractor` JSON-LD from `siteConfig`. |
-| **Mobile Sticky Cap** | `/src/components/MobileBottomBar.tsx` | Stays strictly under 15% mobile viewport height. |
-
----
-
-## 8. Assumptions and TODO(VERIFY) Items
-
-1. **`// TODO(VERIFY): ExpressCheckoutElement under Payments for Card-on-File Deposit`**
-   - *Location:* `/src/components/CheckoutDeposit.tsx`, `/src/server/whop/payments.ts`
-   - *Detail:* In current Whop Elements, `<ExpressCheckoutElement />` requires a `<Checkout>` handle. When card-on-file (`setupFutureUsage="off_session"`) is needed for subsequent final balance invoicing, the standard card form via `<PaymentElement>` under `<Payments>` provides reliable off-session credential vaulting. Verify with Whop documentation if Express Checkout supports automatic off-session agreement pass-through.
-2. **`// TODO(VERIFY): Member Search by Email in Multi-Company Scenarios`**
-   - *Location:* `/src/server/whop/leads.ts`, `/src/server/whop/invoices.ts`
-   - *Detail:* `client.members.list({ account_id, query: email })` matches exact email addresses when the API key possesses `member:email:read`. If a customer has never purchased through Whop before, they may not yet exist as a member on the account until their first checkout or draft invoice creation. Our adapter gracefully falls back to attaching full contact details to lead metadata.
-3. **`// TODO(VERIFY): Whop Elements Sandbox Environment Availability`**
-   - *Location:* `/src/site.config.ts`, `server.ts`
-   - *Detail:* `VITE_WHOP_ENV` defaults to `"production"`. Whop sandbox environments require a corresponding sandbox organization in the Whop dashboard.
+See `/docs/RESKIN.md` for a 15-minute onboarding walkthrough. Re-skinning requires editing only `/src/site.config.ts`.

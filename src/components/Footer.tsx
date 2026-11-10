@@ -2,10 +2,25 @@ import React from 'react';
 import { Phone, Mail, MapPin, ShieldCheck, ArrowUpRight } from 'lucide-react';
 import { siteConfig } from '../site.config.js';
 
-export const Footer: React.FC = () => {
+export interface FooterProps {
+  onOpenLegal?: (type: 'privacy' | 'terms') => void;
+}
+
+export const Footer: React.FC<FooterProps> = ({ onOpenLegal }) => {
   return (
     <footer className="bg-slate-950 text-slate-400 py-16 border-t border-slate-900 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {siteConfig.isSample && (
+          <div className="mb-8 p-3 rounded-xl bg-amber-950/60 border border-amber-800/80 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <span>
+              <strong>Contractor Pitch Notice:</strong> This website template contains illustrative sample data (reviews, license identifier, and coverage map) for demonstration purposes. Edit <code className="bg-slate-900 px-1 py-0.5 rounded font-mono text-amber-300">src/site.config.ts</code> to insert production client credentials.
+            </span>
+            <span className="font-mono text-[10px] bg-amber-900/60 px-2 py-0.5 rounded text-amber-300 whitespace-nowrap">
+              isSample: true
+            </span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-12 border-b border-slate-900">
           {/* Brand Info (col-span-5) */}
           <div className="lg:col-span-5 space-y-4">
@@ -90,12 +105,26 @@ export const Footer: React.FC = () => {
           <p>
             &copy; {new Date().getFullYear()} {siteConfig.brand.name}. All rights reserved. Built for Whop Websites.
           </p>
-          <div className="flex items-center gap-4">
-            <span>Powered by Whop Payments</span>
+          <div className="flex flex-wrap items-center gap-4">
+            <button
+              type="button"
+              onClick={() => onOpenLegal?.('privacy')}
+              className="hover:text-slate-300 underline underline-offset-2"
+            >
+              Privacy Policy
+            </button>
+            <span aria-hidden="true">·</span>
+            <button
+              type="button"
+              onClick={() => onOpenLegal?.('terms')}
+              className="hover:text-slate-300 underline underline-offset-2"
+            >
+              Terms of Service
+            </button>
             <span aria-hidden="true">·</span>
             <span className="flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              PCI-DSS Level 1 Encrypted
+              Whop PCI-DSS Level 1 Encrypted
             </span>
           </div>
         </div>
