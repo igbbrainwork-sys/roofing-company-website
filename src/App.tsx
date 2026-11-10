@@ -4,6 +4,8 @@ import { PlaceholderBanner } from './components/PlaceholderBanner.js';
 import { Header } from './components/Header.js';
 import { Hero } from './components/Hero.js';
 import { ServicesSection } from './components/ServicesSection.js';
+import { RoofCalculator } from './components/RoofCalculator.js';
+import { CraftsmanshipShowcase } from './components/CraftsmanshipShowcase.js';
 import { ServiceAreaSection } from './components/ServiceAreaSection.js';
 import { FinancingSection } from './components/FinancingSection.js';
 import { ReviewsSection } from './components/ReviewsSection.js';
@@ -129,6 +131,8 @@ export default function App() {
       <main className="flex-1">
         <Hero />
         <ServicesSection />
+        <RoofCalculator />
+        <CraftsmanshipShowcase />
         <ServiceAreaSection />
         <FinancingSection />
         <ReviewsSection />

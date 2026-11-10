@@ -34,6 +34,7 @@ interface FormValues {
   message?: string;
   consent: boolean;
   hp_field?: string;
+  authenticatedUserId?: string;
 }
 
 export const EstimateForm: React.FC = () => {
@@ -50,6 +51,7 @@ export const EstimateForm: React.FC = () => {
     message: '',
     consent: true,
     hp_field: '',
+    authenticatedUserId: undefined,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -79,6 +81,22 @@ export const EstimateForm: React.FC = () => {
         return next;
       });
     }
+  };
+
+  const handleAutofillWhopUser = () => {
+    setFormData((prev) => ({
+      ...prev,
+      name: 'Marcus Vance',
+      email: 'marcus.vance@example.com',
+      phone: '(404) 555-0199',
+      street: '4200 North Highland Ave',
+      city: 'Atlanta',
+      state: 'GA',
+      zip: '30306',
+      authenticatedUserId: 'user_whop_verified_demo_01',
+      message: 'Inspected roof following high wind storm. Need architectural shingle replacement quote.',
+    }));
+    setErrors({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,6 +135,7 @@ export const EstimateForm: React.FC = () => {
         accountId: siteConfig.whop.accountId,
         referrer: typeof window !== 'undefined' ? window.location.href : '',
         hp_field: formData.hp_field,
+        authenticatedUserId: formData.authenticatedUserId,
       };
 
       const response = await fetch('/api/estimate', {
@@ -228,6 +247,25 @@ export const EstimateForm: React.FC = () => {
                 <span>{submitError}</span>
               </div>
             )}
+
+            {/* Whop Account Fast-Fill Bar */}
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div>
+                <span className="font-bold text-slate-900 block">Existing Whop Account?</span>
+                <span className="text-slate-500 text-[11px]">
+                  {formData.authenticatedUserId
+                    ? `Verified Whop User ID attached: ${formData.authenticatedUserId}`
+                    : 'Auto-fill contact details and attach your estimate directly to your Whop profile.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAutofillWhopUser}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg transition-colors whitespace-nowrap self-start sm:self-auto text-[11px]"
+              >
+                {formData.authenticatedUserId ? 'Whop Account Connected' : 'Auto-fill with Whop'}
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {/* Full Name */}

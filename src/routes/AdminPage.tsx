@@ -34,10 +34,50 @@ export const AdminPage: React.FC = () => {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Vaulted payment method selection
+  const [paymentMethodId, setPaymentMethodId] = useState<string>('');
+  const [discoveredCards, setDiscoveredCards] = useState<any[]>([]);
+  const [isLookingUpCards, setIsLookingUpCards] = useState(false);
+  const [cardLookupNote, setCardLookupNote] = useState<string | null>(null);
+
+  // Invoices filter
+  const [invoiceFilter, setInvoiceFilter] = useState<'all' | 'paid' | 'open'>('all');
+
   // Recent leads and invoices lists
   const [recentLeads, setRecentLeads] = useState<any[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
   const [isLoadingLists, setIsLoadingLists] = useState(false);
+
+  const lookupCardsForCustomer = async () => {
+    if (!customerEmail) return;
+    setIsLookingUpCards(true);
+    setCardLookupNote(null);
+    try {
+      const res = await fetch(
+        `/api/admin/payment-methods?email=${encodeURIComponent(customerEmail)}&accountId=${siteConfig.whop.accountId}`,
+        {
+          headers: { 'X-Admin-Token': adminToken },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const cards = data.paymentMethods || [];
+        setDiscoveredCards(cards);
+        if (cards.length > 0) {
+          setPaymentMethodId(cards[0].id);
+          setCardLookupNote(`Found ${cards.length} vaulted payment method(s) in Whop.`);
+        } else {
+          setCardLookupNote('No vaulted cards found for this email. Invoice will send as email link.');
+        }
+      } else {
+        setCardLookupNote('Unable to query payment methods. Check API permissions.');
+      }
+    } catch {
+      setCardLookupNote('Network error looking up customer payment methods.');
+    } finally {
+      setIsLookingUpCards(false);
+    }
+  };
 
   const loadRecentData = async () => {
     setIsLoadingLists(true);
@@ -90,6 +130,7 @@ export const AdminPage: React.FC = () => {
           planId,
           amountUSD,
           mode,
+          paymentMethodId: mode === 'auto' && paymentMethodId ? paymentMethodId : undefined,
           billingAddress: {
             line1: street,
             city,
@@ -285,6 +326,77 @@ export const AdminPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Card Vault Discovery (Mode: auto) */}
+              {mode === 'auto' && (
+                <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 text-[11px] uppercase tracking-wider">
+                      Vaulted Payment Method Discovery
+                    </span>
+                    <button
+                      type="button"
+                      onClick={lookupCardsForCustomer}
+                      disabled={isLookingUpCards || !customerEmail}
+                      className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-slate-300 hover:bg-slate-100 rounded text-slate-700 transition-colors flex items-center gap-1"
+                    >
+                      {isLookingUpCards ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Searching Whop Vault...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-3 h-3 text-amber-600" />
+                          <span>Look Up Saved Cards</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {cardLookupNote && (
+                    <p className="text-[11px] text-slate-500 italic">{cardLookupNote}</p>
+                  )}
+
+                  {discoveredCards.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      {discoveredCards.map((card) => {
+                        const isSelected = paymentMethodId === card.id;
+                        return (
+                          <div
+                            key={card.id}
+                            onClick={() => setPaymentMethodId(card.id)}
+                            className={`p-2 rounded-lg border text-xs cursor-pointer flex items-center justify-between transition-colors ${
+                              isSelected
+                                ? 'border-amber-500 bg-amber-50/50 text-slate-900 font-semibold'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="w-4 h-4 text-amber-600" />
+                              <span>
+                                {card.card?.brand?.toUpperCase() || 'CARD'} •••• {card.card?.last4 || '4242'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">({card.id})</span>
+                            </div>
+                            {isSelected && (
+                              <span className="text-[10px] text-amber-800 bg-amber-200/60 px-1.5 py-0.5 rounded font-bold">
+                                Selected
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!discoveredCards.length && !cardLookupNote && (
+                    <p className="text-[11px] text-slate-400">
+                      Click "Look Up Saved Cards" to find previously vaulted payment methods from project deposits.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Plan ID & Amount */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

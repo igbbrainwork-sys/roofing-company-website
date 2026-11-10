@@ -22,24 +22,21 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/' }) => {
           </a>
 
           {/* Zone 2: Navigation Links (single line, no capsules) */}
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-600">
+          <nav className="hidden lg:flex items-center gap-7 text-sm font-medium text-slate-600">
             <a href="/#services" className="hover:text-slate-900 transition-colors whitespace-nowrap">
               Services
+            </a>
+            <a href="/#calculator" className="hover:text-slate-900 transition-colors whitespace-nowrap">
+              Calculator
+            </a>
+            <a href="/#craftsmanship" className="hover:text-slate-900 transition-colors whitespace-nowrap">
+              Forensic Proof
             </a>
             <a href="/#service-area" className="hover:text-slate-900 transition-colors whitespace-nowrap">
               Service Area
             </a>
-            <a href="/#financing" className="hover:text-slate-900 transition-colors whitespace-nowrap">
-              Financing
-            </a>
-            <a href="/#reviews" className="hover:text-slate-900 transition-colors whitespace-nowrap">
-              Reviews
-            </a>
             <a href="/#pricing" className="hover:text-slate-900 transition-colors whitespace-nowrap">
               Book Online
-            </a>
-            <a href="/#faq" className="hover:text-slate-900 transition-colors whitespace-nowrap">
-              FAQ
             </a>
           </nav>
 
