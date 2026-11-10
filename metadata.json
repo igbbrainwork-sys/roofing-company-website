@@ -1,0 +1,6 @@
+{
+  "name": "Apex Roofing & Restoration – Whop Template",
+  "description": "Production-ready, reusable website template for US roofing contractors powered by Whop Elements, Payments, Leads, and Invoices.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

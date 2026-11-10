@@ -1,0 +1,24 @@
+{
+  "$schema": "https://whop.com/schemas/app.json",
+  "name": "Apex Roofing & Restoration",
+  "description": "Production-ready US roofing contractor website template hosted on Whop Websites",
+  "version": "1.0.0",
+  "type": "website",
+  "framework": "vite",
+  "elements": {
+    "version": "latest",
+    "required": [
+      "checkout",
+      "payments",
+      "branding"
+    ]
+  },
+  "permissions": [
+    "lead:manage",
+    "member:email:read",
+    "member:basic:read",
+    "access_pass:basic:read",
+    "payment:charge",
+    "payment:basic:read"
+  ]
+}
